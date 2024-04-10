@@ -1,0 +1,107 @@
+lcd dot site: https://maxpromer.github.io/LCD-Character-Creator/
+/////////////////////////////////////////////////////////////////////
+
+//시계 기본 코드
+
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include "RTClib.h"
+#include "DHT.h"
+
+#define DHTPIN 2
+#define DHTTYPE DHT11
+
+RTC_DS3231 rtc;
+LiquidCrystal_I2C lcd(0x27,16,2);
+DHT dht(DHTPIN, DHTTYPE);
+
+char daysOfTheWeek[7][4] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+
+
+void setup() {
+  lcd.init();
+  lcd.backlight();
+  lcd.setCursor(0,0);
+  lcd.print("Hello, world!");
+
+  Serial.begin(57600);
+#ifndef ESP8266
+  while (!Serial); // wait for serial port to connect. Needed for native USB
+#endif
+
+  if (! rtc.begin()) {
+    Serial.println("Couldn't find RTC");
+    Serial.flush();
+    while (1) delay(10);
+  }
+
+  if (rtc.lostPower()) {
+    Serial.println("RTC lost power, let's set the time!");
+    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+  }
+
+  dht.begin();
+}
+
+void loop() {
+  DateTime now = rtc.now();
+  float h = dht.readHumidity();
+  float t = dht.readTemperature();
+  float f = dht.readTemperature(true);
+ 
+  if (isnan(h) || isnan(t)|| isnan(f)) {
+    Serial.println(F("Failed to read from DHT sensor!"));
+    return;
+  }
+ 
+  float hif = dht.computeHeatIndex(f, h);
+
+  lcd.clear();
+  lcd.setCursor(0,0);
+  lcd.print(now.year());
+  lcd.setCursor(4,0);
+  lcd.write(47);  // chr '/'
+  lcd.setCursor(5,0);
+  lcd.print(now.month());
+  lcd.setCursor(7,0);
+  lcd.write(47);  // chr '/'
+  lcd.setCursor(8,0);
+  lcd.print(now.day());
+  lcd.setCursor(11,0);
+  lcd.write(60);  // chr '<'
+  lcd.setCursor(12,0);
+  lcd.print(daysOfTheWeek[now.dayOfTheWeek()]);
+  lcd.setCursor(15,0);
+  lcd.write(62);  // chr '>'
+
+  lcd.setCursor(0,1);
+  lcd.print(now.hour());
+  lcd.setCursor(2,1);
+  lcd.write(58);  // chr ':'
+  lcd.setCursor(3,1);
+  if(now.minute() < 10){
+    lcd.print("0");
+  }
+  lcd.print(now.minute());
+  lcd.setCursor(5,1);
+  lcd.write(58);  // chr ':'
+  lcd.setCursor(6,1);
+  lcd.print(now.second());
+   
+  delay(5000);
+ 
+  lcd.clear();
+  lcd.setCursor(0,0);
+  lcd.print("Humi: ");
+  lcd.setCursor(5,0);
+  lcd.print(h);
+  lcd.setCursor(10,0);
+  lcd.write(37);  // chr '%'
+  lcd.setCursor(0,1);
+  lcd.print("Temp: ");
+  lcd.setCursor(5,1);
+  lcd.print(t);
+  lcd.setCursor(10,1);
+  lcd.print("C");
+  delay(5000);
+}
